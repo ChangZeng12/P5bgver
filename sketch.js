@@ -1,17 +1,29 @@
 let bodies = [];
-let mouseInsideCanvas = true;
+let mouseInsideCanvas = false;
+let mousePos = null;
 
 function setup() {
   const container = document.getElementById('p5-container');
   const w = container.offsetWidth;
   const h = container.offsetHeight;
 
-  const canvas = createCanvas(w, h);
-  canvas.parent(container);
+  canvas = createCanvas(w, h);
+canvas.parent(container);
+canvas.style('background', 'transparent'); // ✅ 设置 canvas 背景透明
 
-  // 绑定鼠标事件检测是否在 canvas 中
-  canvas.mouseOver(() => mouseInsideCanvas = true);
-  canvas.mouseOut(() => mouseInsideCanvas = false);
+  // DOM 原生鼠标事件监听（适配 iframe）
+  canvas.elt.addEventListener('mouseenter', () => {
+    mouseInsideCanvas = true;
+  });
+
+  canvas.elt.addEventListener('mouseleave', () => {
+    mouseInsideCanvas = false;
+  });
+
+  canvas.elt.addEventListener('mousemove', (e) => {
+    const rect = canvas.elt.getBoundingClientRect();
+    mousePos = createVector(e.clientX - rect.left, e.clientY - rect.top);
+  });
 
   generateBodies();
   textAlign(CENTER, CENTER);
@@ -22,19 +34,18 @@ function draw() {
   clear();
 
   // 鼠标控制隐藏引力体
-  if (bodies[0]) {
-    let x = constrain(mouseX, 0, width);
-    let y = constrain(mouseY, 0, height);
+  if (mouseInsideCanvas && mousePos && bodies[0]) {
+    let x = constrain(mousePos.x, 0, width);
+    let y = constrain(mousePos.y, 0, height);
     bodies[0].pos.set(x, y);
     bodies[0].vel.set(0, 0);
   }
 
-  // 小球受力计算
+  // 小球受力逻辑
   for (let i = 1; i < bodies.length; i++) {
     let totalForce = createVector(0, 0);
 
-    if (mouseInsideCanvas) {
-      // 鼠标在 canvas 内：正常引力逻辑
+    if (mouseInsideCanvas && mousePos) {
       for (let j = 0; j < bodies.length; j++) {
         if (i !== j) {
           let force = calculateAttraction(bodies[j], bodies[i]);
@@ -42,7 +53,6 @@ function draw() {
         }
       }
     } else {
-      // 鼠标离开 canvas：吸向中心点
       let centerPos = createVector(width / 2, height / 2);
       let toCenter = p5.Vector.sub(centerPos, bodies[i].pos);
       let d = constrain(toCenter.mag(), 10, 100);
@@ -55,14 +65,14 @@ function draw() {
     applyForce(bodies[i], totalForce);
   }
 
-  // 更新和绘制两个可见 body
+  // 更新和绘制可见 body
   for (let i = 1; i < bodies.length; i++) {
     updateBody(bodies[i]);
     drawBody(bodies[i]);
   }
 
-  // 提示文字
-  fill(255, 100);
+  /*// 文本提示
+  fill(0, 150);
   noStroke();
   text(
     mouseInsideCanvas
@@ -71,6 +81,15 @@ function draw() {
     width / 2,
     20
   );
+
+  // 左上角鼠标坐标调试信息
+  fill(0);
+  textSize(14);
+  if (mousePos) {
+    text(`mouseX: ${mousePos.x.toFixed(1)}\nmouseY: ${mousePos.y.toFixed(1)}`, width / 2, 30);
+  } else {
+    text(`No mousePos yet`, width / 2, 30);
+  }*/
 }
 
 function keyPressed() {
@@ -82,17 +101,17 @@ function keyPressed() {
 function generateBodies() {
   bodies = [];
 
-  // 鼠标控制的引力源（隐藏）
+  // 鼠标控制的 body（隐藏）
   bodies.push({
-    pos: createVector(mouseX, mouseY),
+    pos: createVector(width / 2, height / 2),
     vel: createVector(0, 0),
-    mass: 150,
+    mass: 200,
     size: 15,
     color: color('#B8ACAC'),
     trail: []
   });
 
-  // 可见的两个小球
+  // 两个可见的 body
   for (let i = 0; i < 2; i++) {
     bodies.push({
       pos: createVector(random(100, width - 100), random(100, height - 100)),
