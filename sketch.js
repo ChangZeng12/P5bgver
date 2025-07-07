@@ -1,51 +1,47 @@
+// sketch.js (to be deployed on GitHub Pages inside iframe)
+
 let bodies = [];
-let mouseInsideCanvas = false;
+let mouseInside = false;
 let mousePos = null;
 
 function setup() {
-  const container = document.getElementById('p5-container');
-  const w = container.offsetWidth;
-  const h = container.offsetHeight;
-
-  canvas = createCanvas(w, h);
-canvas.parent(container);
-canvas.style('background', 'transparent'); // ✅ 设置 canvas 背景透明
-
-  // DOM 原生鼠标事件监听（适配 iframe）
-  canvas.elt.addEventListener('mouseenter', () => {
-    mouseInsideCanvas = true;
-  });
-
-  canvas.elt.addEventListener('mouseleave', () => {
-    mouseInsideCanvas = false;
-  });
-
-  canvas.elt.addEventListener('mousemove', (e) => {
-    const rect = canvas.elt.getBoundingClientRect();
-    mousePos = createVector(e.clientX - rect.left, e.clientY - rect.top);
-  });
+  const canvas = createCanvas(windowWidth, windowHeight);
+  canvas.style('position', 'absolute');
+  canvas.style('top', '0');
+  canvas.style('left', '0');
+  canvas.style('z-index', '-1');
+  canvas.style('background', 'transparent');
+  canvas.elt.style.pointerEvents = 'none';
 
   generateBodies();
-  textAlign(CENTER, CENTER);
+  textAlign(LEFT, TOP);
   textSize(14);
+
+  // Receive mouse position from parent
+  window.addEventListener('message', (e) => {
+    const data = e.data;
+    if (typeof data === 'object' && 'inside' in data) {
+      mouseInside = data.inside;
+      if (mouseInside && 'x' in data && 'y' in data) {
+        mousePos = createVector(data.x, data.y);
+      } else {
+        mousePos = null;
+      }
+    }
+  });
 }
 
 function draw() {
   clear();
 
-  // 鼠标控制隐藏引力体
-  if (mouseInsideCanvas && mousePos && bodies[0]) {
-    let x = constrain(mousePos.x, 0, width);
-    let y = constrain(mousePos.y, 0, height);
-    bodies[0].pos.set(x, y);
+  if (mouseInside && mousePos && bodies[0]) {
+    bodies[0].pos.set(mousePos.x, mousePos.y);
     bodies[0].vel.set(0, 0);
   }
 
-  // 小球受力逻辑
   for (let i = 1; i < bodies.length; i++) {
     let totalForce = createVector(0, 0);
-
-    if (mouseInsideCanvas && mousePos) {
+    if (mouseInside && mousePos) {
       for (let j = 0; j < bodies.length; j++) {
         if (i !== j) {
           let force = calculateAttraction(bodies[j], bodies[i]);
@@ -53,65 +49,34 @@ function draw() {
         }
       }
     } else {
-      let centerPos = createVector(width / 2, height / 2);
-      let toCenter = p5.Vector.sub(centerPos, bodies[i].pos);
+      let center = createVector(width / 2, height / 2);
+      let toCenter = p5.Vector.sub(center, bodies[i].pos);
       let d = constrain(toCenter.mag(), 10, 100);
       toCenter.normalize();
       let strength = (bodies[i].mass * 50) / (d * d);
       let force = toCenter.mult(strength);
       totalForce.add(force);
     }
-
     applyForce(bodies[i], totalForce);
   }
 
-  // 更新和绘制可见 body
   for (let i = 1; i < bodies.length; i++) {
     updateBody(bodies[i]);
     drawBody(bodies[i]);
-  }
-
-  /*// 文本提示
-  fill(0, 150);
-  noStroke();
-  text(
-    mouseInsideCanvas
-      ? 'Mouse = Gravity Source • Press "R" to regenerate'
-      : 'Mouse left → Returning to center...',
-    width / 2,
-    20
-  );
-
-  // 左上角鼠标坐标调试信息
-  fill(0);
-  textSize(14);
-  if (mousePos) {
-    text(`mouseX: ${mousePos.x.toFixed(1)}\nmouseY: ${mousePos.y.toFixed(1)}`, width / 2, 30);
-  } else {
-    text(`No mousePos yet`, width / 2, 30);
-  }*/
-}
-
-function keyPressed() {
-  if (key === 'r' || key === 'R') {
-    generateBodies();
   }
 }
 
 function generateBodies() {
   bodies = [];
-
-  // 鼠标控制的 body（隐藏）
   bodies.push({
     pos: createVector(width / 2, height / 2),
     vel: createVector(0, 0),
-    mass: 200,
+    mass: 100,
     size: 15,
     color: color('#B8ACAC'),
     trail: []
   });
 
-  // 两个可见的 body
   for (let i = 0; i < 2; i++) {
     bodies.push({
       pos: createVector(random(100, width - 100), random(100, height - 100)),
@@ -159,6 +124,5 @@ function drawBody(body) {
 }
 
 function windowResized() {
-  const container = document.getElementById('p5-container');
-  resizeCanvas(container.offsetWidth, container.offsetHeight);
+  resizeCanvas(windowWidth, windowHeight);
 }
